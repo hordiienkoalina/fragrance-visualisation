@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Perfume Production Visualization</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+<script src="config.js"></script>
+<style>
+body { margin: 0; padding: 0; }
+#map { position: absolute; top: 0; bottom: 0; width: 100%; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+    mapboxgl.accessToken = mapboxConfig.MAPBOX_ACCESS_TOKEN;
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: [12, 50],
+        zoom: 2.2
+    });
+
+    // Load your aggregated data
+    fetch('data/perfumes_aggregated.json')
+    .then(response => response.json())
+    .then(data => {
+        map.on('load', () => {
+            map.addSource('countries', {
+                type: 'vector',
+                url: 'mapbox://mapbox.country-boundaries-v1'
+            });
+
+            // Build a GL match expression that defines the color for every vector tile feature
+            const matchExpression = ['match', ['get', 'iso_3166_1_alpha_3']];
+
+            // Calculate color values for each country based on perfume count
+            data.forEach(row => {
+                // Example: Convert the range of perfume counts to a suitable color
+                // Adjust the color scale for a soft purple gradient
+                const intensity = Math.min(row['Perfume Count'], 100); // Cap the intensity for visualization purposes
+            
+                // Adjust these values to get the desired shade of purple
+                const red = 128 + (intensity * 0.5); // Soft purple has more blue than red
+                const blue = 128 + (intensity * 1.27); // Higher blue component for softness
+                const green = intensity * 0.2; // Minimal green component
+            
+                const color = `rgba(${red}, ${green}, ${blue}, 0.8)`;
+                matchExpression.push(row['Country'], color);
+            });
+
+            // Last value is the default, used where there is no data
+            matchExpression.push('rgba(0, 0, 0, 0)');
+
+            const WORLDVIEW = "US";
+            const worldview_filter = ["all", ["==", ["get", "disputed"], "false"], ["any", ["==", "all", ["get", "worldview"]], ["in", WORLDVIEW, ["get", "worldview"]]]];
+
+            map.addLayer({
+                'id': 'countries-join',
+                'type': 'fill',
+                'source': 'countries',
+                'source-layer': 'country_boundaries',
+                'paint': {
+                    'fill-color': matchExpression
+                },
+                'filter': worldview_filter
+            }, 'admin-1-boundary-bg');
+        });
+    });
+</script>
+</body>
+</html>
